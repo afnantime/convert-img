@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Convert Images</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/preline/dist/preline.css">
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+</head>
+
+<body class="bg-gray-100 flex items-center justify-center min-h-screen w-full">
+    <div class="bg-white p-8 rounded shadow-md w-full max-w-4xl">
+        <h1 class="text-2xl font-bold mb-4">Convert Images</h1>
+        <form id="upload-form" enctype="multipart/form-data" class="mb-4">
+
+
+            <div class="flex items-center justify-center w-full">
+                <label for="dropzone-file"
+                    class="flex flex-col items-center justify-center w-full h-64 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:hover:border-gray-500 dark:hover:bg-gray-600", id="dp">
+                    <div class="flex flex-col items-center justify-center pt-5 pb-6">
+                        <svg class="w-8 h-8 mb-4 text-gray-500 dark:text-gray-400" aria-hidden="true"
+                            xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 16">
+                            <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M13 13h3a3 3 0 0 0 0-6h-.025A5.56 5.56 0 0 0 16 6.5 5.5 5.5 0 0 0 5.207 5.021C5.137 5.017 5.071 5 5 5a4 4 0 0 0 0 8h2.167M10 15V6m0 0L8 8m2-2 2 2" />
+                        </svg>
+                        <p class="mb-2 text-sm text-gray-500 dark:text-gray-400"><span class="font-semibold">Click to
+                                upload</span> or drag and drop</p>
+                        <p class="text-xs text-gray-500 dark:text-gray-400">JFIF, PNG, JPG or GIF</p>
+                    </div>
+                    <input id="dropzone-file" class="hidden" type="file" name="file" multiple />
+                </label>
+            </div>
+            <div class="w-full mt-4">
+                <p class="text-gray-500">Convert to:</p>
+            </div>
+            <div class="flex items-center justify-center w-full mt-4">
+                <select name="format" id="format"
+                    class="block w-full text-sm text-gray-500 bg-white border border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring focus:ring-blue-500 focus:ring-opacity-50">
+                    <option value="png">PNG</option>
+                    <option value="jpg">JPG</option>
+                    <option value="ico">ICO</option>
+                    <option value="webp">WEBP</option>
+                </select>
+            </div>
+        </form>
+        <div id="progress-container" class="hidden mt-4">
+            <div class="relative pt-1">
+                <div class="flex mb-2 items-center justify-between">
+                    <div>
+                        <span
+                            class="text-xs font-semibold inline-block py-1 px-2 uppercase rounded-full text-blue-600 bg-blue-200">
+                            Uploading...
+                        </span>
+                    </div>
+                    <div class="text-right">
+                        <span class="text-xs font-semibold inline-block text-blue-600" id="progress-percentage">
+                            0%
+                        </span>
+                    </div>
+                </div>
+                <div class="overflow-hidden h-2 mb-4 text-xs flex rounded bg-blue-200">
+                    <div style="width:0%" id="progress-bar"
+                        class="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-blue-500">
+                    </div>
+                </div>
+            </div>
+        </div>
+        <ul id="file-list" class="hidden">
+        </ul>
+    </div>
+    <script>
+        $(document).ready(function () {
+            var dropzone = $('#dropzone-file');
+            // Highlight drop area when file is dragged over it
+            $('#dp').on('dragover', function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                $(this).addClass('bg-gray-200'); // Change background or add a class
+            });
+
+            // Revert drop area styling when file is no longer dragged over it
+            $('#dp').on('dragleave', function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                $(this).removeClass('bg-gray-200'); // Revert background or remove the class
+            });
+
+            // Handle file drop
+            $('#dp').on('drop', function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                $(this).removeClass('bg-gray-200'); // Revert background or remove the class
+
+                var files = e.originalEvent.dataTransfer.files;
+                // If you want to support multiple files, pass them here
+                dropzone.prop('files', files);
+
+                // Trigger the change event to start the upload process
+                dropzone.trigger('change');
+            });
+
+            $('#dropzone-file').on('change', function () {
+                $('#progress-container').removeClass('hidden');
+                var formData = new FormData($('#upload-form')[0]);
+                var targetFormat = $('#format').val();
+                formData.append('format', targetFormat);
+                $.ajax({
+                    url: '/upload',
+                    type: 'POST',
+                    data: formData,
+                    processData: false,
+                    contentType: false,
+                    xhr: function () {
+                        var xhr = new window.XMLHttpRequest();
+                        xhr.upload.addEventListener('progress', function (evt) {
+                            if (evt.lengthComputable) {
+                                var percentComplete = evt.loaded / evt.total;
+                                percentComplete = parseInt(percentComplete * 100);
+                                $('#progress-bar').css('width', percentComplete + '%');
+                                $('#progress-percentage').text(percentComplete + '%');
+                            }
+                        }, false);
+                        return xhr;
+                    },
+                    success: function (response) {
+                        $('#file-list').empty().removeClass('hidden');
+                        response.files.forEach(function (file) {
+                            var listItem = $('<li class="flex items-center justify-between mb-2 p-4 border border-gray-200 rounded">')
+                                .append($('<span class="file-name" style="overflow: hidden; text-overflow: ellipsis;">').text(file))
+                                .append($('<a class="bg-blue-500 text-white py-2 px-4 rounded-lg">')
+                                    .attr('href', '/uploads/' + file)
+                                    .attr('download', '')
+                                    .text('Download'));
+                            $('#file-list').append(listItem);
+                        });
+                    },
+                    error: function () {
+                        console.log('Upload failed');
+                    },
+                    complete: function () {
+                        $('#progress-container').addClass('hidden');
+                        $('#progress-bar').css('width', '0%');
+                        $('#progress-percentage').text('0%');
+
+
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+
+</html>
